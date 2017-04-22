@@ -1,0 +1,8 @@
+* Outline
+* Test interactive mode
+* Test diff
+* Test assuming role with MFA
+* Test tailing
+* Sleep func
+* Remove check_point from plan, and don't check_point in diff command.
+* Dump

@@ -92,21 +92,6 @@ class DAG(object):
         return transposed
 
     def walk(self, walk_func, graph=None):
-        """ Walks each node of the graph in reverse topological order.
-
-        This can be used to perform a set of operations, where the next
-        operation depends on the previous operation. It's important to note
-        that walking happens serially, and is not paralellized.
-        """
-        if not graph:
-            graph = self.graph
-        nodes = self.topological_sort(graph=graph)
-        # Reverse so we start with nodes that have no dependencies.
-        nodes.reverse()
-        for n in nodes:
-            walk_func(n)
-
-    def walk_parallel(self, walk_func, graph=None):
         """ Walks each node of the graph, in parallel if it can.
 
         The walk_func is only called when the nodes dependencies have been

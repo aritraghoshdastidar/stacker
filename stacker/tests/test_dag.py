@@ -67,19 +67,8 @@ def test_reset_graph():
     assert dag.graph == {}
 
 
-@with_setup(start_with_graph)
-def test_walk():
-    nodes = []
-
-    def walk_func(n):
-        nodes.append(n)
-
-    dag.walk(walk_func)
-    assert nodes == ['d', 'b', 'c', 'a']
-
-
 @with_setup(blank_setup)
-def test_walk_parallel():
+def test_walk():
     dag = DAG()
 
     # b and c should be executed at the same time.
@@ -97,13 +86,13 @@ def test_walk_parallel():
         lock.release()
         return True
 
-    ok = dag.walk_parallel(walk_func)
+    ok = dag.walk(walk_func)
     assert ok == True  # noqa: E712
     assert nodes == ['d', 'c', 'b', 'a'] or nodes == ['d', 'b', 'c', 'a']
 
 
 @with_setup(blank_setup)
-def test_walk_parallel_failed():
+def test_walk_failed():
     dag = DAG()
 
     # b and c should be executed at the same time.
@@ -121,7 +110,7 @@ def test_walk_parallel_failed():
         lock.release()
         return False
 
-    ok = dag.walk_parallel(walk_func)
+    ok = dag.walk(walk_func)
 
     # Only 2 should have been hit. The rest are canceled because they depend on
     # the success of d.
@@ -130,7 +119,7 @@ def test_walk_parallel_failed():
 
 
 @with_setup(blank_setup)
-def test_walk_parallel_exception():
+def test_walk_exception():
     dag = DAG()
 
     # b and c should be executed at the same time.
@@ -148,7 +137,7 @@ def test_walk_parallel_exception():
         lock.release()
         raise Exception('well shit')
 
-    ok = dag.walk_parallel(walk_func)
+    ok = dag.walk(walk_func)
 
     # Only 2 should have been hit. The rest are canceled because they depend on
     # the success of d.
