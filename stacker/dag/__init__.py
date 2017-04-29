@@ -99,8 +99,14 @@ class DAG(object):
         """
         if not graph:
             graph = self.graph
+
+        # First, we'll topologically sort all of the nodes, with nodes that
+        # have no dependencies first. We do this to ensure that we don't call
+        # .join on a thread that hasn't yet been started.
+        #
+        # TODO(ejholmes): An alternative would be to ensure that Thread.join
+        # blocks if the thread has not yet been started.
         nodes = self.topological_sort(graph=graph)
-        # Reverse so we start with nodes that have no dependencies.
         nodes.reverse()
 
         # This maps a node name to a thread of execution.
