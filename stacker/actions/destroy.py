@@ -1,6 +1,6 @@
 import logging
 
-from .base import BaseAction, check_point_fn
+from .base import BaseAction, check_point_fn, outline_plan
 from ..exceptions import StackDoesNotExist
 from .. import util
 from ..status import (
@@ -88,11 +88,12 @@ class Action(BaseAction):
     def run(self, force, tail=False, semaphore=None, *args, **kwargs):
         plan = self._generate_plan(tail=tail)
         if force:
-            plan.outline(logging.DEBUG)
+            outline_plan(plan, logging.DEBUG)
             plan.execute(semaphore=semaphore)
         else:
-            plan.outline(message="To execute this plan, run with \"--force\" "
-                                 "flag.")
+            outline_plan(
+                plan,
+                message="To execute this plan, run with \"--force\" flag.")
 
     def post_run(self, outline=False, *args, **kwargs):
         """Any steps that need to be taken after running the action."""

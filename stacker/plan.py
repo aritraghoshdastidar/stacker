@@ -185,9 +185,6 @@ class Plan(object):
     def keys(self):
         return [k for k in self.steps]
 
-    def outline(self, level=logging.INFO, message=""):
-        pass
-
 
 def null_check_point(plan):
     pass

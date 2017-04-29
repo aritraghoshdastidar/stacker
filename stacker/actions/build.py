@@ -1,6 +1,6 @@
 import logging
 
-from .base import BaseAction, check_point_fn
+from .base import BaseAction, check_point_fn, outline_plan
 from .. import util
 from ..exceptions import (
     CancelExecution,
@@ -276,7 +276,7 @@ class Action(BaseAction):
         """
         plan = self._generate_plan(tail=tail)
         if not outline and not dump:
-            plan.outline(logging.DEBUG)
+            outline_plan(plan, logging.DEBUG)
             logger.debug("Launching stacks: %s", ", ".join(plan.keys()))
             plan.execute(semaphore=semaphore)
         else:

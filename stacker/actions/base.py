@@ -15,6 +15,36 @@ from stacker.session_cache import get_session
 logger = logging.getLogger(__name__)
 
 
+def outline_plan(plan, level=logging.INFO, message=""):
+    """Print an outline of the actions the plan is going to take.
+    The outline will represent the rough ordering of the steps that will be
+    taken.
+    Args:
+        level (int, optional): a valid log level that should be used to log
+            the outline
+        message (str, optional): a message that will be logged to
+            the user after the outline has been logged.
+    """
+    steps = 1
+    logger.log(level, "Plan \"%s\":", plan.description)
+
+    nodes = plan.dag.topological_sort()
+    nodes.reverse()
+    for step_name in nodes:
+        step = plan.steps[step_name]
+        logger.log(
+            level,
+            "  - step: %s: target: \"%s\", action: \"%s\"",
+            steps,
+            step_name,
+            step.fn.__name__,
+        )
+        steps += 1
+
+    if message:
+        logger.log(level, message)
+
+
 def check_point_fn():
     """Adds a check_point function to each of the given steps."""
 

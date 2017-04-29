@@ -1,6 +1,7 @@
 import logging
 import threading
 
+from .base import outline_plan
 from .. import exceptions
 from ..plan import COMPLETE, Plan
 from ..status import NotSubmittedStatus, NotUpdatedStatus, CancelledStatus
@@ -201,7 +202,7 @@ class Action(build.Action):
 
     def run(self, *args, **kwargs):
         plan = self._generate_plan()
-        plan.outline(logging.DEBUG)
+        outline_plan(plan, logging.DEBUG)
         logger.info("Diffing stacks: %s", ", ".join(plan.keys()))
         plan.execute(semaphore=threading.Semaphore(1))
 
