@@ -74,15 +74,15 @@ class TestPlan(unittest.TestCase):
             definition=generate_definition('bastion', 1, requires=[vpc.fqn]),
             context=self.context)
 
-        plan = Plan(description="Test", steps=[Step(vpc), Step(bastion)])
-
         calls = []
 
         def fn(step):
             calls.append(step.name)
             return COMPLETE
 
-        plan.execute(fn)
+        plan = Plan(
+            description="Test", steps=[Step(vpc, fn), Step(bastion, fn)])
+        plan.execute()
 
         self.assertEquals(calls, ['namespace-vpc.1', 'namespace-bastion.1'])
 
@@ -94,10 +94,6 @@ class TestPlan(unittest.TestCase):
             definition=generate_definition('bastion', 1, requires=[vpc.fqn]),
             context=self.context)
 
-        vpc_step = Step(vpc)
-        bastion_step = Step(bastion)
-        plan = Plan(description="Test", steps=[vpc_step, bastion_step])
-
         calls = []
 
         def fn(step):
@@ -106,7 +102,11 @@ class TestPlan(unittest.TestCase):
                 return CANCELLED
             return COMPLETE
 
-        plan.execute(fn)
+        vpc_step = Step(vpc, fn)
+        bastion_step = Step(bastion, fn)
+        plan = Plan(description="Test", steps=[vpc_step, bastion_step])
+
+        plan.execute()
 
         self.assertEquals(calls, ['namespace-vpc.1'])
 
@@ -118,10 +118,6 @@ class TestPlan(unittest.TestCase):
             definition=generate_definition('bastion', 1, requires=[vpc.fqn]),
             context=self.context)
 
-        vpc_step = Step(vpc)
-        bastion_step = Step(bastion)
-        plan = Plan(description="Test", steps=[vpc_step, bastion_step])
-
         calls = []
 
         def fn(step):
@@ -130,7 +126,11 @@ class TestPlan(unittest.TestCase):
                 return SKIPPED
             return COMPLETE
 
-        plan.execute(fn)
+        vpc_step = Step(vpc, fn)
+        bastion_step = Step(bastion, fn)
+
+        plan = Plan(description="Test", steps=[vpc_step, bastion_step])
+        plan.execute()
 
         self.assertEquals(calls, ['namespace-vpc.1', 'namespace-bastion.1'])
 
@@ -141,7 +141,7 @@ class TestPlan(unittest.TestCase):
             context=self.context)
 
         with self.assertRaises(GraphError) as expected:
-            Plan(description="Test", steps=[Step(bastion)])
+            Plan(description="Test", steps=[Step(bastion, None)])
         message = ("Error detected when adding 'namespace-vpc.1' "
                    "as a dependency of 'namespace-bastion.1': node "
                    "namespace-vpc.1 does not exist")
@@ -162,7 +162,9 @@ class TestPlan(unittest.TestCase):
             context=self.context)
 
         with self.assertRaises(GraphError) as expected:
-            Plan(description="Test", steps=[Step(vpc), Step(db), Step(app)])
+            Plan(
+                description="Test",
+                steps=[Step(vpc, None), Step(db, None), Step(app, None)])
         message = ("Error detected when adding 'namespace-db.1' "
                    "as a dependency of 'namespace-app.1': graph is "
                    "not acyclic")

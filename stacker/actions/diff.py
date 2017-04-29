@@ -2,7 +2,7 @@ import logging
 import threading
 
 from .. import exceptions
-from ..plan import COMPLETE, Plan, Step
+from ..plan import COMPLETE, Plan
 from ..status import NotSubmittedStatus, NotUpdatedStatus, CancelledStatus
 from . import build
 import difflib
@@ -191,15 +191,19 @@ class Action(build.Action):
                                 old_params)
         return COMPLETE
 
+    def _action(self, *args, **kwargs):
+        return self._diff_stack(*args, **kwargs)
+
     def _generate_plan(self):
-        steps = [Step(stack) for stack in self.context.get_stacks()]
-        return Plan(description="Diff stacks", steps=steps)
+        return Plan(
+            description="Diff stacks",
+            steps=self.steps)
 
     def run(self, *args, **kwargs):
         plan = self._generate_plan()
         plan.outline(logging.DEBUG)
         logger.info("Diffing stacks: %s", ", ".join(plan.keys()))
-        plan.execute(self._diff_stack, semaphore=threading.Semaphore(1))
+        plan.execute(semaphore=threading.Semaphore(1))
 
     """Don't ever do anything for pre_run or post_run"""
     def pre_run(self, *args, **kwargs):

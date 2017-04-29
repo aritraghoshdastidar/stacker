@@ -1,6 +1,6 @@
 import logging
 
-from .base import BaseAction
+from .base import BaseAction, check_point_fn
 from ..exceptions import StackDoesNotExist
 from .. import util
 from ..status import (
@@ -9,7 +9,7 @@ from ..status import (
     CancelledStatus,
     SUBMITTED,
 )
-from ..plan import Plan, Step
+from ..plan import Plan
 
 from ..status import StackDoesNotExist as StackDoesNotExistStatus
 
@@ -32,9 +32,15 @@ class Action(BaseAction):
 
     """
 
+    def _action(self, *args, **kwargs):
+        return self._destroy_stack(*args, **kwargs)
+
     def _generate_plan(self, tail=False):
-        steps = [Step(stack) for stack in self.context.get_stacks()]
-        return Plan(description="Destroy stacks", steps=steps, reverse=True)
+        return Plan(
+            description="Destroy stacks",
+            steps=self.steps,
+            check_point=check_point_fn(),
+            reverse=True)
 
     def _destroy_stack(self, step):
         stack = step.stack
@@ -83,7 +89,7 @@ class Action(BaseAction):
         plan = self._generate_plan(tail=tail)
         if force:
             plan.outline(logging.DEBUG)
-            plan.execute(self._destroy_stack, semaphore=semaphore)
+            plan.execute(semaphore=semaphore)
         else:
             plan.outline(message="To execute this plan, run with \"--force\" "
                                  "flag.")

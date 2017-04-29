@@ -1,9 +1,6 @@
-import threading
 import logging
 import time
 import uuid
-
-from colorama.ansi import Fore
 
 from .exceptions import (
     GraphError,
@@ -29,13 +26,25 @@ class Step(object):
 
     """
 
-    def __init__(self, stack):
+    def __init__(self, stack, fn=None, check_point=None):
         self.stack = stack
         self.status = PENDING
         self.last_updated = time.time()
+        self.fn = fn
+        self.check_point = check_point
 
     def __repr__(self):
         return "<stacker.plan.Step:%s>" % (self.stack.fqn,)
+
+    def run(self):
+        """Runs this step until it has completed successfully, or been
+        skipped.
+        """
+
+        while not self.done:
+            status = self.fn(self)
+            self.set_status(status)
+        return self.ok
 
     @property
     def name(self):
@@ -87,6 +96,8 @@ class Step(object):
         if status is not self.status:
             logger.debug("Setting %s state to %s.", self.stack.name,
                          status.name)
+            if self.check_point:
+                self.check_point()
             self.status = status
             self.last_updated = time.time()
 
@@ -122,46 +133,31 @@ class Plan(object):
 
     """
 
-    def __init__(self, description, steps=None, reverse=False):
+    def __init__(self, description=None, steps=None,
+                 reverse=False, check_point=None):
+        self.id = uuid.uuid4()
         self.description = description
+        self.check_point = check_point or null_check_point
+
+        if check_point:
+            def _check_point():
+                check_point(self)
+
+            for step in steps:
+                step.check_point = _check_point
+
         self.steps = {step.name: step for step in steps}
         self.dag = build_dag(steps)
         if reverse:
             self.dag = self.dag.transpose()
-        self.id = uuid.uuid4()
 
-    def execute(self, fn, **kwargs):
-        """Executes the plan by walking the graph.
+    def execute(self, **kwargs):
+        self.check_point(self)
+        ret = self.walk(**kwargs)
+        self.check_point(self)
+        return ret
 
-        Args:
-            fn (func): a function that will be executed for each step. The
-                function will be called multiple times until the step is
-                `done`. The function should return a :class:`Status` each time
-                it is called.
-
-        """
-
-        lock = threading.Lock()
-
-        def check_point():
-            lock.acquire()
-            self._check_point()
-            lock.release()
-
-        check_point()
-
-        def step_func(step):
-            while not step.done:
-                last_status = step.status
-                status = fn(step)
-                step.set_status(status)
-                if status != last_status:
-                    check_point()
-            return step.ok
-
-        return self.walk(step_func, **kwargs)
-
-    def walk(self, step_func, semaphore=None):
+    def walk(self, semaphore=None):
         """Walks each step in the underlying graph, in topological order.
 
         Args:
@@ -180,7 +176,7 @@ class Plan(object):
             step = self.steps[step_name]
             semaphore.acquire()
             try:
-                return step_func(step)
+                return step.run()
             finally:
                 semaphore.release()
 
@@ -192,41 +188,9 @@ class Plan(object):
     def outline(self, level=logging.INFO, message=""):
         pass
 
-    def _check_point(self):
-        """Outputs the current status of all steps in the plan."""
-        status_to_color = {
-            SUBMITTED.code: Fore.YELLOW,
-            COMPLETE.code: Fore.GREEN,
-        }
-        logger.info("Plan Status:", extra={"reset": True, "loop": self.id})
 
-        longest = 0
-        messages = []
-
-        nodes = self.dag.topological_sort()
-        nodes.reverse()
-        for step_name in nodes:
-            step = self.steps[step_name]
-
-            length = len(step.name)
-            if length > longest:
-                longest = length
-
-            msg = "%s: %s" % (step.name, step.status.name)
-            if step.status.reason:
-                msg += " (%s)" % (step.status.reason)
-
-            messages.append((msg, step))
-
-        for msg, step in messages:
-            parts = msg.split(' ', 1)
-            fmt = "\t{0: <%d}{1}" % (longest + 2,)
-            color = status_to_color.get(step.status.code, Fore.WHITE)
-            logger.info(fmt.format(*parts), extra={
-                'loop': self.id,
-                'color': color,
-                'last_updated': step.last_updated,
-            })
+def null_check_point(plan):
+    pass
 
 
 def build_dag(steps):

@@ -1,10 +1,68 @@
 import threading
 import logging
 
+from colorama.ansi import Fore
+
+from ..plan import Step
+from ..status import (
+    SUBMITTED,
+    COMPLETE,
+)
+
 import botocore.exceptions
 from stacker.session_cache import get_session
 
 logger = logging.getLogger(__name__)
+
+
+def check_point_fn():
+    """Adds a check_point function to each of the given steps."""
+
+    lock = threading.Lock()
+
+    def _fn(plan):
+        lock.acquire()
+        _check_point(plan)
+        lock.release()
+
+    return _fn
+
+
+def _check_point(plan):
+    """Outputs the current status of all steps in the plan."""
+    status_to_color = {
+        SUBMITTED.code: Fore.YELLOW,
+        COMPLETE.code: Fore.GREEN,
+    }
+    logger.info("Plan Status:", extra={"reset": True, "loop": plan.id})
+
+    longest = 0
+    messages = []
+
+    nodes = plan.dag.topological_sort()
+    nodes.reverse()
+    for step_name in nodes:
+        step = plan.steps[step_name]
+
+        length = len(step.name)
+        if length > longest:
+            longest = length
+
+        msg = "%s: %s" % (step.name, step.status.name)
+        if step.status.reason:
+            msg += " (%s)" % (step.status.reason)
+
+        messages.append((msg, step))
+
+    for msg, step in messages:
+        parts = msg.split(' ', 1)
+        fmt = "\t{0: <%d}{1}" % (longest + 2,)
+        color = status_to_color.get(step.status.code, Fore.WHITE)
+        logger.info(fmt.format(*parts), extra={
+            'loop': plan.id,
+            'color': color,
+            'last_updated': step.last_updated,
+        })
 
 
 def stack_template_key_name(blueprint):
@@ -58,6 +116,17 @@ class BaseAction(object):
         self.bucket_name = context.bucket_name
         self._conn = None
         self.cancel = cancel or threading.Event()
+
+    def _action(self):
+        raise NotImplementedError
+
+    @property
+    def steps(self):
+        if not hasattr(self, "_steps"):
+            self._steps = [
+                Step(stack, fn=self._action)
+                for stack in self.context.get_stacks()]
+        return self._steps
 
     @property
     def s3_conn(self):

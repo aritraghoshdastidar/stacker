@@ -1,6 +1,6 @@
 import logging
 
-from .base import BaseAction
+from .base import BaseAction, check_point_fn
 from .. import util
 from ..exceptions import (
     CancelExecution,
@@ -9,7 +9,7 @@ from ..exceptions import (
     StackDoesNotExist,
 )
 
-from ..plan import Plan, Step
+from ..plan import Plan
 from ..status import (
     NotSubmittedStatus,
     NotUpdatedStatus,
@@ -243,9 +243,14 @@ class Action(BaseAction):
 
         return new_status
 
+    def _action(self, *args, **kwargs):
+        return self._launch_stack(*args, **kwargs)
+
     def _generate_plan(self, tail=False):
-        steps = [Step(stack) for stack in self.context.get_stacks()]
-        return Plan(description="Create/Update stacks", steps=steps)
+        return Plan(
+            description="Create/Update stacks",
+            steps=self.steps,
+            check_point=check_point_fn())
 
     def pre_run(self, outline=False, dump=False, *args, **kwargs):
         """Any steps that need to be taken prior to running the action."""
@@ -273,7 +278,7 @@ class Action(BaseAction):
         if not outline and not dump:
             plan.outline(logging.DEBUG)
             logger.debug("Launching stacks: %s", ", ".join(plan.keys()))
-            plan.execute(self._launch_stack, semaphore=semaphore)
+            plan.execute(semaphore=semaphore)
         else:
             if outline:
                 plan.outline()
